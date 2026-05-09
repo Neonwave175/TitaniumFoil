@@ -1,0 +1,16 @@
+[package]
+name    = "titaniumfoil-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "titaniumfoil"
+path = "src/main.rs"
+
+[[bin]]
+name = "titaniumfoil-bench"
+path = "src/bench.rs"
+
+[dependencies]
+titaniumfoil-core  = { workspace = true }
+titaniumfoil-metal = { workspace = true }

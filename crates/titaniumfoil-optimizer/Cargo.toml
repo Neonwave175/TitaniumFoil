@@ -1,0 +1,17 @@
+[package]
+name    = "titaniumfoil-optimizer"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "titaniumfoil-opt"
+path = "src/main.rs"
+
+[[bin]]
+name = "titaniumfoil-re"
+path = "src/bin/re_calc.rs"
+
+[dependencies]
+titaniumfoil-core  = { workspace = true }
+titaniumfoil-metal = { workspace = true }
+rayon       = "1.10"

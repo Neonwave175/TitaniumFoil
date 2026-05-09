@@ -1,0 +1,7 @@
+[package]
+name    = "titaniumfoil-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ndarray = { workspace = true }

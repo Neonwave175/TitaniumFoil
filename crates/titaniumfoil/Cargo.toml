@@ -1,0 +1,15 @@
+[package]
+name    = "titaniumfoil"
+version.workspace = true
+edition.workspace = true
+description = "GPU-accelerated NACA airfoil analysis — high-level Rust API"
+license.workspace = true
+
+[lib]
+name = "titaniumfoil"
+path = "src/lib.rs"
+
+[dependencies]
+titaniumfoil-core  = { workspace = true }
+titaniumfoil-metal = { workspace = true }
+rayon = { workspace = true }

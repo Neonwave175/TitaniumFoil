@@ -1,0 +1,13 @@
+[package]
+name    = "titaniumfoil-metal"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+titaniumfoil-core = { workspace = true }
+metal      = { workspace = true }
+objc       = { workspace = true }
+rayon      = { workspace = true }
+
+[build-dependencies]
+# xcrun invoked directly from build.rs — no extra deps needed

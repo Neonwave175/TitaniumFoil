@@ -1,0 +1,23 @@
+[workspace]
+members = [
+    "crates/titaniumfoil-core",
+    "crates/titaniumfoil-metal",
+    "crates/titaniumfoil-cli",
+    "crates/titaniumfoil-optimizer",
+    "crates/titaniumfoil",
+]
+resolver = "2"
+
+[workspace.package]
+version     = "0.1.0"
+edition     = "2021"
+authors     = ["Neonwave175"]
+license     = "GPL-2.0"
+
+[workspace.dependencies]
+titaniumfoil-core  = { path = "crates/titaniumfoil-core" }
+titaniumfoil-metal = { path = "crates/titaniumfoil-metal" }
+ndarray     = "0.16"
+metal       = "0.29"
+objc        = "0.2"
+rayon       = "1.10"

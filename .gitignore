@@ -1,0 +1,4 @@
+target/
+*.metallib
+*.air
+.DS_Store

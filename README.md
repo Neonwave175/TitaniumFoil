@@ -27,7 +27,7 @@ speed-up over the CPU path on M-series hardware. The optimizer searches NACA 4-d
 
 | Requirement | Version |
 |-------------|---------|
-| macOS | 13 Ventura or later |
+| macOS | 15 Sequoia or later |
 | Hardware | Apple Silicon (M1 / M2 / M3 / M4 family) |
 | Xcode Command Line Tools | any recent version (for `xcrun metal`) |
 | Rust toolchain | 1.70 or later |

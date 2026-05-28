@@ -6,6 +6,7 @@ members = [
     "crates/titaniumfoil-optimizer",
     "crates/titaniumfoil",
     "crates/titaniumfoil-py",
+    "crates/titaniumfoil-ffi",
 ]
 # titaniumfoil-py requires Python + maturin — excluded from default build.
 # Build it explicitly: ./build.sh --python
@@ -15,6 +16,7 @@ default-members = [
     "crates/titaniumfoil-cli",
     "crates/titaniumfoil-optimizer",
     "crates/titaniumfoil",
+    "crates/titaniumfoil-ffi",
 ]
 resolver = "2"
 

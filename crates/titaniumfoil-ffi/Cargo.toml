@@ -1,0 +1,13 @@
+[package]
+name    = "titaniumfoil-ffi"
+version.workspace = true
+edition.workspace = true
+description = "C FFI layer for TitaniumFoil — use from C++ via titaniumfoil.hpp"
+license.workspace = true
+
+[lib]
+name      = "titaniumfoil"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+tf = { package = "titaniumfoil", path = "../titaniumfoil", features = ["embedded-shaders"] }

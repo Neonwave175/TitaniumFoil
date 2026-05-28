@@ -420,6 +420,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "titaniumfoil-ffi"
+version = "0.1.0"
+dependencies = [
+ "titaniumfoil",
+]
+
+[[package]]
 name = "titaniumfoil-metal"
 version = "0.1.0"
 dependencies = [

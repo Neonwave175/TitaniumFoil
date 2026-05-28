@@ -257,6 +257,127 @@ dispatch, which is the main optimizer hot path.
 
 ---
 
+## Rust API
+
+Add to `Cargo.toml`:
+
+```toml
+[dependencies]
+titaniumfoil = { git = "https://github.com/Neonwave175/TitaniumFoil.git" }
+```
+
+```rust
+use titaniumfoil::Solver;
+
+let solver = Solver::new();                          // nside=65
+let solver = Solver::with_panels(120);               // higher accuracy
+
+// Single point
+let p = solver.analyze("4412", 4.0, 200_000.0)?.unwrap();
+println!("L/D = {:.1}", p.ld);
+
+// Polar — panel matrix built once
+let alphas: Vec<f64> = (-5..=15).map(|a| a as f64).collect();
+let polar = solver.polar("4412", &alphas, 200_000.0)?;
+
+// Multi-Re — specal once per alpha, skin friction per Re
+let grid = solver.polar_multi_re("4412", &[0.,2.,4.,6.], &[80e3, 150e3, 300e3])?;
+
+// Batch — one GPU dispatch for many airfoils
+let results = solver.analyze_batch(&["4412","2412","63412"], 4.0, 200_000.0);
+
+// Parallel with rayon — each thread gets its own GPU context
+use rayon::prelude::*;
+let scores: Vec<f64> = nacas.par_iter()
+    .filter_map(|n| solver.analyze(n, 4.0, 200_000.0).ok()?.map(|p| p.ld))
+    .collect();
+```
+
+---
+
+## Python API
+
+```bash
+pip install maturin
+pip install "git+https://github.com/Neonwave175/TitaniumFoil.git#subdirectory=crates/titaniumfoil-py"
+```
+
+Or via the build script:
+
+```bash
+python3 -m venv ~/tf-env
+./build.sh --venv=~/tf-env
+source ~/tf-env/bin/activate
+```
+
+```python
+from titaniumfoil import Solver
+
+solver = Solver()           # nside=65
+solver = Solver(nside=120)  # higher accuracy
+
+# Single point
+p = solver.analyze("4412", 4.0, 200_000)
+print(f"CL={p.cl:.4f}  L/D={p.ld:.1f}")
+
+# Polar
+polar = solver.polar("4412", list(range(-5, 15)), 200_000)
+best = max((p for p in polar if p), key=lambda p: p.ld)
+
+# Multi-Re
+grid = solver.polar_multi_re("4412", [0,2,4,6,8], [80e3, 150e3, 300e3])
+
+# Batch
+results = solver.analyze_batch(["4412","2412","63412","65415"], 4.0, 200_000)
+
+# pandas-friendly
+df_row = solver.analyze("4412", 4.0, 200_000).to_dict()
+```
+
+---
+
+## C++ API
+
+Build the shared library first:
+
+```bash
+cargo build --release -p titaniumfoil-ffi
+# produces target/release/libtitaniumfoil.dylib and libtitaniumfoil.a
+```
+
+Include the header and link:
+
+```cpp
+#include "include/titaniumfoil.hpp"
+
+tf::Solver solver;           // nside=65
+tf::Solver solver(120);      // higher accuracy
+
+// Single point
+if (auto p = solver.analyze("4412", 4.0, 200'000))
+    std::cout << "L/D = " << p->ld << "\n";
+
+// Polar
+std::vector<double> alphas;
+for (int a = -5; a <= 15; ++a) alphas.push_back(a);
+auto polar = solver.polar("4412", alphas, 200'000);
+
+// Multi-Re  →  grid[re_idx][alpha_idx]
+auto grid = solver.polar_multi_re("4412", {0,2,4,6,8}, {80e3,150e3,300e3});
+```
+
+Compile:
+
+```bash
+clang++ -std=c++17 main.cpp \
+    -I/path/to/TitaniumFoil \
+    -L/path/to/TitaniumFoil/target/release -ltitaniumfoil \
+    -framework Metal -framework Foundation -framework CoreGraphics \
+    -Wl,-rpath,/path/to/TitaniumFoil/target/release
+```
+
+---
+
 ## License
 
-GPL-2.0. See COPYING. Based on XFOIL by Mark Drela (MIT), which is also GPL-2.0.
+GPL-2.0. See LICENSE. Based on XFOIL by Mark Drela (MIT), which is also GPL-2.0.

@@ -48,11 +48,30 @@ ok "Xcode CLT: $(xcode-select -p)"
 # ── Metal toolchain ───────────────────────────────────────────────────────────
 info "Checking Metal shader compiler..."
 if ! xcrun metal --version &>/dev/null 2>&1; then
-    warn "Metal toolchain missing — downloading (~700 MB)..."
-    xcodebuild -downloadComponent MetalToolchain
+    warn "Metal toolchain missing — attempting to install..."
+
+    # Xcode needs runFirstLaunch before component downloads work
+    info "Running xcodebuild -runFirstLaunch to repair Xcode plugins..."
+    sudo xcodebuild -runFirstLaunch 2>/dev/null || true
+
+    info "Downloading Metal toolchain (~700 MB)..."
+    if ! xcodebuild -downloadComponent MetalToolchain 2>/dev/null; then
+        warn "Automatic download failed."
+        echo ""
+        echo "  Install the Metal toolchain manually:"
+        echo "    1. Open Xcode → Settings → Platforms"
+        echo "    2. Or: sudo xcodebuild -runFirstLaunch"
+        echo "    3. Then re-run this script"
+        echo ""
+        warn "Continuing without Metal toolchain — shader compile will use cache if available."
+    fi
 fi
-METAL_VER=$(xcrun metal --version 2>&1 | head -1)
-ok "Metal: $METAL_VER"
+
+if xcrun metal --version &>/dev/null 2>&1; then
+    ok "Metal: $(xcrun metal --version 2>&1 | head -1)"
+else
+    warn "Metal shader compiler not available — pre-compiled shaders will be used if present"
+fi
 
 # ── Homebrew ──────────────────────────────────────────────────────────────────
 info "Checking Homebrew..."

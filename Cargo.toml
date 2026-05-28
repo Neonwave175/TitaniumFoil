@@ -5,6 +5,7 @@ members = [
     "crates/titaniumfoil-cli",
     "crates/titaniumfoil-optimizer",
     "crates/titaniumfoil",
+    "crates/titaniumfoil-py",
 ]
 resolver = "2"
 

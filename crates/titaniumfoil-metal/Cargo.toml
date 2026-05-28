@@ -9,5 +9,10 @@ metal      = { workspace = true }
 objc       = { workspace = true }
 rayon      = { workspace = true }
 
+[features]
+# Embed compiled .metallib bytes directly into the binary.
+# Required for cdylib / Python wheels — eliminates the runtime filesystem path.
+embedded-shaders = []
+
 [build-dependencies]
 # xcrun invoked directly from build.rs — no extra deps needed

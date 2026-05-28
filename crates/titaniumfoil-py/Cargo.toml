@@ -1,0 +1,13 @@
+[package]
+name    = "titaniumfoil-py"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name       = "titaniumfoil"
+crate-type = ["cdylib"]
+
+[dependencies]
+tf = { package = "titaniumfoil", path = "../titaniumfoil" }
+pyo3 = { version = "0.22", features = ["extension-module"] }
+

@@ -1,0 +1,15 @@
+[build-system]
+requires      = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name            = "titaniumfoil"
+version         = "0.1.0"
+description     = "GPU-accelerated NACA airfoil analysis for Apple Silicon"
+requires-python = ">=3.8"
+license         = { text = "GPL-2.0" }
+keywords        = ["aerodynamics", "naca", "airfoil", "cfd", "metal", "gpu"]
+
+[tool.maturin]
+features    = ["pyo3/extension-module"]
+module-name = "titaniumfoil"

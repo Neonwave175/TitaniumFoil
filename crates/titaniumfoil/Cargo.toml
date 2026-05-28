@@ -9,6 +9,9 @@ license.workspace = true
 name = "titaniumfoil"
 path = "src/lib.rs"
 
+[features]
+embedded-shaders = ["titaniumfoil-metal/embedded-shaders"]
+
 [dependencies]
 titaniumfoil-core  = { workspace = true }
 titaniumfoil-metal = { workspace = true }

@@ -56,8 +56,7 @@ impl MetalContext {
         let queue  = device.new_command_queue();
 
         let shader_dir = env!("METAL_SHADER_DIR");
-        let lib = load_metallib(&device,
-            &format!("{shader_dir}/panel_influence.metallib"));
+        let lib = load_metallib(&device, &resolve_metallib(shader_dir, "panel_influence"));
 
         let panel_pipeline = make_pipeline(&device, &lib, "panel_influence_2d");
         let batch_pipeline = make_pipeline(&device, &lib, "panel_influence_batch");
@@ -114,6 +113,37 @@ impl MetalContext {
             }
         }
     }
+}
+
+/// Resolve a .metallib path at runtime.
+/// Tries the compile-time path first; if missing, searches sibling OUT_DIR
+/// directories (handles editable Python installs where the build hash differs).
+fn resolve_metallib(compiled_dir: &str, name: &str) -> String {
+    let primary = format!("{compiled_dir}/{name}.metallib");
+    if std::path::Path::new(&primary).exists() {
+        return primary;
+    }
+    // Walk sibling build directories looking for the same filename
+    if let Some(build_dir) = std::path::Path::new(compiled_dir)
+        .parent().and_then(|p| p.parent())
+    {
+        if let Ok(entries) = std::fs::read_dir(build_dir) {
+            let mut candidates: Vec<_> = entries
+                .flatten()
+                .filter(|e| e.file_name().to_string_lossy().starts_with("titaniumfoil-metal-"))
+                .map(|e| e.path().join("out").join(format!("{name}.metallib")))
+                .filter(|p| p.exists())
+                .collect();
+            // Prefer most recently modified
+            candidates.sort_by_key(|p| {
+                p.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+            });
+            if let Some(found) = candidates.last() {
+                return found.to_string_lossy().into_owned();
+            }
+        }
+    }
+    primary  // return original; Metal will give a clear error
 }
 
 fn load_metallib(device: &Device, path: &str) -> Library {

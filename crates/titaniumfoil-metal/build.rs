@@ -20,20 +20,33 @@ fn compile_shader(name: &str, shader_dir: &Path, out_dir: &str) -> bool {
     }
 
     // .metal → .air
-    let air_ok = Command::new("xcrun")
+    // Strip env vars that maturin/PyO3 set and that can confuse xcrun
+    // (SDKROOT, TARGET, MACOSX_DEPLOYMENT_TARGET, etc.)
+    let path = std::env::var("PATH").unwrap_or_default();
+    let home = std::env::var("HOME").unwrap_or_default();
+    let air_out = Command::new("xcrun")
         .args(["metal", "-c", src.to_str().unwrap(), "-o", &air])
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false);
+        .env_clear()
+        .env("PATH", &path)
+        .env("HOME", &home)
+        .output();
+    let air_ok = air_out.as_ref().map(|o| o.status.success()).unwrap_or(false);
 
     if !air_ok {
-        eprintln!("build.rs: metal compile failed for {name}.metal");
+        if let Ok(ref o) = air_out {
+            println!("cargo:warning=xcrun metal stderr: {}", String::from_utf8_lossy(&o.stderr).replace('\n', " | "));
+            println!("cargo:warning=xcrun metal stdout: {}", String::from_utf8_lossy(&o.stdout).replace('\n', " | "));
+        }
+        println!("cargo:warning=metal compile failed for {name}.metal");
         return false;
     }
 
     // .air → .metallib
     let lib_ok = Command::new("xcrun")
         .args(["metallib", &air, "-o", &lib])
+        .env_clear()
+        .env("PATH", &path)
+        .env("HOME", &home)
         .status()
         .map(|s| s.success())
         .unwrap_or(false);
@@ -44,6 +57,24 @@ fn compile_shader(name: &str, shader_dir: &Path, out_dir: &str) -> bool {
     }
 
     true
+}
+
+/// If xcrun fails, look for a pre-compiled .metallib from another build of
+/// the same crate (e.g. the workspace release build) in sibling OUT_DIR dirs.
+fn find_precompiled(name: &str, out_dir: &str) -> Option<PathBuf> {
+    // out_dir = .../target/<profile>/build/titaniumfoil-metal-HASH/out
+    let out_path   = PathBuf::from(out_dir);
+    let build_dir  = out_path.parent()?.parent()?; // .../target/<profile>/build/
+    for entry in std::fs::read_dir(build_dir).ok()?.flatten() {
+        let fname = entry.file_name().to_string_lossy().into_owned();
+        if fname.starts_with("titaniumfoil-metal-") {
+            let metallib = entry.path().join("out").join(format!("{name}.metallib"));
+            if metallib.exists() {
+                return Some(metallib);
+            }
+        }
+    }
+    None
 }
 
 fn main() {
@@ -57,18 +88,32 @@ fn main() {
     let shader_dir   = manifest_dir.join("../../shaders");
     let out_dir      = env::var("OUT_DIR").unwrap();
 
-    // Also watch build.rs itself
     println!("cargo:rerun-if-changed=build.rs");
 
     let shaders = ["panel_influence", "blvar_compute", "blsys_solve"];
     let mut built = 0;
 
     for name in &shaders {
+        let lib = format!("{out_dir}/{name}.metallib");
+        // Already compiled into this OUT_DIR (incremental build)
+        if Path::new(&lib).exists() {
+            built += 1;
+            continue;
+        }
+
         if compile_shader(name, &shader_dir, &out_dir) {
             built += 1;
             println!("cargo:warning=Compiled {name}.metal → {name}.metallib");
         } else {
-            println!("cargo:warning=Skipped {name}.metal (compile error — check shader syntax)");
+            // xcrun failed — try a pre-compiled metallib from another build
+            if let Some(src) = find_precompiled(name, &out_dir) {
+                if std::fs::copy(&src, &lib).is_ok() {
+                    built += 1;
+                    println!("cargo:warning=Copied pre-compiled {name}.metallib from {}", src.display());
+                    continue;
+                }
+            }
+            println!("cargo:warning=Skipped {name}.metal (xcrun failed, no pre-compiled fallback)");
         }
     }
 

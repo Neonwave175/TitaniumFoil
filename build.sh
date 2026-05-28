@@ -14,6 +14,24 @@ echo "  ║      TitaniumFoil  build script      ║"
 echo "  ╚══════════════════════════════════════╝"
 echo -e "${NC}"
 
+# ── parse flags ───────────────────────────────────────────────────────────────
+BUILD_PYTHON=0
+PYTHON_VENV=""
+for arg in "$@"; do
+    case "$arg" in
+        --python)          BUILD_PYTHON=1 ;;
+        --venv=*)          PYTHON_VENV="${arg#--venv=}"; BUILD_PYTHON=1 ;;
+        --help|-h)
+            echo "Usage: ./build.sh [--python] [--venv=/path/to/venv]"
+            echo ""
+            echo "  (no flags)          build Rust CLI binaries only"
+            echo "  --python            also build & install Python bindings"
+            echo "  --venv=/path/venv   install Python bindings into that venv"
+            echo ""
+            exit 0 ;;
+    esac
+done
+
 # ── macOS check ───────────────────────────────────────────────────────────────
 [[ "$(uname)" == "Darwin" ]] || die "This project requires macOS (Metal GPU support)"
 
@@ -51,45 +69,103 @@ if ! command -v rustc &>/dev/null && [[ ! -f "$HOME/.cargo/env" ]]; then
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
 fi
 
-# source cargo env if needed
 [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
 
 if ! command -v rustc &>/dev/null; then
     die "Rust still not found after install — open a new terminal and re-run"
 fi
 
-RUST_INSTALLED=$(rustc --version)
 info "Updating Rust toolchain..."
 rustup update stable --no-self-update 2>&1 | grep -E "updated|unchanged|stable" | head -2
-RUST_CURRENT=$(rustc --version)
-ok "Rust: $RUST_CURRENT"
+ok "Rust: $(rustc --version)"
 
-# ── Check Rust version (need 1.70+ for edition 2021 features) ─────────────────
 RUST_MINOR=$(rustc --version | grep -oE '[0-9]+\.[0-9]+' | head -1 | cut -d. -f2)
-if [[ "$RUST_MINOR" -lt 70 ]]; then
-    die "Rust 1.70+ required (have $(rustc --version)) — run: rustup update stable"
+[[ "$RUST_MINOR" -ge 70 ]] || die "Rust 1.70+ required — run: rustup update stable"
+
+# ── Python / maturin (only when --python is set) ─────────────────────────────
+if [[ "$BUILD_PYTHON" -eq 1 ]]; then
+    info "Checking Python bindings prerequisites..."
+
+    # Need Python 3.8+
+    PYTHON_BIN=""
+    for py in python3 python; do
+        if command -v "$py" &>/dev/null; then
+            PY_MAJOR=$("$py" -c "import sys; print(sys.version_info.major)")
+            PY_MINOR=$("$py" -c "import sys; print(sys.version_info.minor)")
+            if [[ "$PY_MAJOR" -ge 3 && "$PY_MINOR" -ge 8 ]]; then
+                PYTHON_BIN="$py"
+                break
+            fi
+        fi
+    done
+    [[ -n "$PYTHON_BIN" ]] || die "Python 3.8+ not found — install Python then re-run"
+    ok "Python: $($PYTHON_BIN --version)"
+
+    # If a venv path was given, use its Python
+    if [[ -n "$PYTHON_VENV" ]]; then
+        [[ -d "$PYTHON_VENV" ]] || die "venv not found: $PYTHON_VENV  (create it first with: python3 -m venv $PYTHON_VENV)"
+        INTERP_FLAG="-i $PYTHON_VENV/bin/python"
+        ok "Target venv: $PYTHON_VENV"
+    else
+        INTERP_FLAG=""
+        warn "No --venv specified — installing into the active Python environment"
+    fi
+
+    # Install maturin if missing
+    info "Checking maturin..."
+    if ! command -v maturin &>/dev/null; then
+        if ! $PYTHON_BIN -c "import maturin" &>/dev/null 2>&1; then
+            warn "maturin not found — installing via pip..."
+            $PYTHON_BIN -m pip install --quiet maturin
+        fi
+    fi
+    MATURIN_BIN="maturin"
+    command -v maturin &>/dev/null || MATURIN_BIN="$PYTHON_BIN -m maturin"
+    ok "maturin: $($MATURIN_BIN --version 2>&1 | head -1)"
 fi
 
-# ── Build ─────────────────────────────────────────────────────────────────────
+# ── Build Rust CLI ────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 echo ""
-info "Building TitaniumFoil (release)..."
+info "Building TitaniumFoil CLI (release)..."
 echo ""
-
 cargo build --release 2>&1
-
 echo ""
-ok "Build complete!"
+ok "Rust build complete!"
+
+# ── Build Python bindings ─────────────────────────────────────────────────────
+if [[ "$BUILD_PYTHON" -eq 1 ]]; then
+    echo ""
+    info "Building Python bindings..."
+    echo ""
+    # shellcheck disable=SC2086
+    $MATURIN_BIN develop --release \
+        --manifest-path crates/titaniumfoil-py/Cargo.toml \
+        $INTERP_FLAG
+    echo ""
+    ok "Python bindings installed!"
+fi
+
+# ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${CYAN}  Binaries:${NC}"
-echo "    ./target/release/titaniumfoil        — solver"
-echo "    ./target/release/titaniumfoil-bench  — GPU vs CPU benchmark"
+echo "    ./target/release/titaniumfoil         — airfoil solver"
+echo "    ./target/release/titaniumfoil-opt     — optimizer"
+echo "    ./target/release/titaniumfoil-re      — Reynolds calculator"
+echo "    ./target/release/titaniumfoil-bench   — benchmark"
 echo ""
 echo -e "${CYAN}  Usage:${NC}"
-echo "    ./target/release/titaniumfoil 0012 5"
-echo "    ./target/release/titaniumfoil 4412 aseq -5 15 1"
-echo "    ./target/release/titaniumfoil 0012 5 1e6 180      # N=359 panels"
-echo "    ./target/release/titaniumfoil-bench 0012 5"
+echo "    ./target/release/titaniumfoil 4412 aseq -5 15 1 200000"
+echo "    ./target/release/titaniumfoil-opt"
+echo "    ./target/release/titaniumfoil-re"
 echo ""
+if [[ "$BUILD_PYTHON" -eq 1 ]]; then
+    echo -e "${CYAN}  Python:${NC}"
+    if [[ -n "$PYTHON_VENV" ]]; then
+        echo "    source $PYTHON_VENV/bin/activate"
+    fi
+    echo "    python3 -c \"from titaniumfoil import Solver; print(Solver().analyze('4412', 4.0, 200000))\""
+    echo ""
+fi

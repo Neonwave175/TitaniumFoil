@@ -10,6 +10,8 @@ name = "titaniumfoil"
 path = "src/lib.rs"
 
 [features]
+# Embed compiled .metallib bytes in the binary — required for pip/wheel installs
+# where the build temp dir is deleted after compilation.
 embedded-shaders = ["titaniumfoil-metal/embedded-shaders"]
 
 [dependencies]

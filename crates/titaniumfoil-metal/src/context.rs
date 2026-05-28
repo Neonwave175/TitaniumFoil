@@ -55,8 +55,23 @@ impl MetalContext {
             .expect("no Metal-capable GPU found");
         let queue  = device.new_command_queue();
 
-        let shader_dir = env!("METAL_SHADER_DIR");
-        let lib = load_metallib(&device, &resolve_metallib(shader_dir, "panel_influence"));
+        // When `embedded-shaders` feature is enabled (Python wheel / pip install),
+        // the compiled .metallib bytes are baked directly into the binary at compile
+        // time via include_bytes!.  No runtime filesystem path is needed, so the
+        // library works after pip cleans up the temporary build directory.
+        #[cfg(feature = "embedded-shaders")]
+        let lib = {
+            static PANEL_BYTES: &[u8] = include_bytes!(
+                concat!(env!("OUT_DIR"), "/panel_influence.metallib")
+            );
+            device.new_library_with_data(PANEL_BYTES)
+                .expect("embedded panel_influence.metallib failed to load")
+        };
+        #[cfg(not(feature = "embedded-shaders"))]
+        let lib = {
+            let shader_dir = env!("METAL_SHADER_DIR");
+            load_metallib(&device, &resolve_metallib(shader_dir, "panel_influence"))
+        };
 
         let panel_pipeline = make_pipeline(&device, &lib, "panel_influence_2d");
         let batch_pipeline = make_pipeline(&device, &lib, "panel_influence_batch");

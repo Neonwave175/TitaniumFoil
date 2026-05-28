@@ -9,5 +9,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 tf = { package = "titaniumfoil", path = "../titaniumfoil" }
-pyo3 = { version = "0.22", features = ["extension-module"] }
+# abi3-py38: builds a stable ABI wheel compatible with Python 3.8+ (including 3.14+)
+# This avoids version-specific wheel names and PyO3's max-version check.
+pyo3 = { version = "0.22", features = ["extension-module", "abi3-py38"] }
 

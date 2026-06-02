@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Open the interactive airfoil shape explorer in your browser.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+open "$SCRIPT_DIR/visualizer/shape.html"

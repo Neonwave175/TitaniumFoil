@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TitaniumFoil — Airfoil Explorer</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#1c2128;
+  --border:#30363d;--text:#e6edf3;--muted:#8b949e;--dim:#6e7681;
+  --blue:#79c0ff;--green:#56d364;--orange:#ffa657;--red:#f78166;--purple:#bc8cff;
+  --cyan:#39d353;--yellow:#e3b341;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);
+  font-family:'SF Mono','JetBrains Mono','Fira Code',ui-monospace,monospace;
+  font-size:13px;overflow:hidden}
+body{display:flex;flex-direction:column}
+
+/* ── Header ── */
+header{
+  display:flex;align-items:center;gap:16px;
+  padding:10px 20px;border-bottom:1px solid var(--border);
+  background:var(--surface);flex-shrink:0;
+}
+header h1{font-size:1rem;font-weight:700;color:var(--blue);letter-spacing:.04em}
+header span{color:var(--muted);font-size:.78rem}
+
+/* ── Main layout ── */
+.layout{display:flex;flex:1;min-height:0}
+
+/* ── Sidebar ── */
+aside{
+  width:260px;flex-shrink:0;border-right:1px solid var(--border);
+  background:var(--surface);overflow-y:auto;padding:16px;
+  display:flex;flex-direction:column;gap:16px;
+}
+.section-label{
+  font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;
+  color:var(--muted);margin-bottom:6px;
+}
+input[type=text]{
+  width:100%;background:var(--bg);border:1px solid var(--border);
+  border-radius:6px;padding:7px 10px;color:var(--text);
+  font-family:inherit;font-size:1rem;font-weight:600;
+  outline:none;transition:border-color .15s;
+}
+input[type=text]:focus{border-color:var(--blue)}
+input[type=text].error{border-color:var(--red)}
+.hint{font-size:.7rem;color:var(--muted);margin-top:4px}
+
+.presets{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.preset-btn{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:5px;padding:3px 8px;color:var(--text);
+  cursor:pointer;font-family:inherit;font-size:.78rem;
+  transition:border-color .12s,background .12s;
+}
+.preset-btn:hover{border-color:var(--blue);background:#1f2937}
+
+input[type=range]{width:100%;accent-color:var(--blue);cursor:pointer}
+.row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.val{color:var(--blue);font-weight:600;min-width:38px;text-align:right}
+
+.toggle-row{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer}
+.toggle-row input{accent-color:var(--blue);cursor:pointer}
+.toggle-row span{color:var(--text)}
+
+/* Compare list */
+.compare-item{
+  display:flex;align-items:center;gap:8px;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;padding:5px 8px;margin-bottom:6px;
+}
+.compare-swatch{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.compare-name{flex:1;font-weight:600}
+.compare-del{
+  background:none;border:none;color:var(--muted);cursor:pointer;
+  font-size:1rem;line-height:1;padding:0 2px;
+}
+.compare-del:hover{color:var(--red)}
+#addCompareBtn{
+  width:100%;background:none;border:1px dashed var(--border);
+  border-radius:6px;padding:6px;color:var(--muted);cursor:pointer;
+  font-family:inherit;transition:border-color .12s,color .12s;
+}
+#addCompareBtn:hover{border-color:var(--blue);color:var(--blue)}
+
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.stat-card{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:7px;padding:7px 9px;
+}
+.stat-card .label{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.stat-card .value{font-size:.95rem;font-weight:700;color:var(--text);margin-top:2px}
+.stat-card .value.accent{color:var(--blue)}
+
+/* ── Canvas area ── */
+main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+#canvas{display:block;width:100%;height:100%}
+.canvas-overlay{
+  position:absolute;bottom:16px;right:16px;
+  background:rgba(13,17,23,.85);border:1px solid var(--border);
+  border-radius:8px;padding:8px 12px;font-size:.72rem;color:var(--muted);
+  backdrop-filter:blur(4px);pointer-events:none;line-height:1.7;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>✦ TitaniumFoil</h1>
+  <span>Airfoil Geometry Explorer</span>
+</header>
+
+<div class="layout">
+<aside>
+
+  <!-- NACA input -->
+  <div>
+    <div class="section-label">Designation</div>
+    <input type="text" id="nacaInput" value="4412" spellcheck="false" autocomplete="off">
+    <div class="hint" id="parseHint">NACA 4412 — 4-digit</div>
+    <div class="presets">
+      <button class="preset-btn" onclick="setNaca('0012')">0012</button>
+      <button class="preset-btn" onclick="setNaca('2412')">2412</button>
+      <button class="preset-btn" onclick="setNaca('4412')">4412</button>
+      <button class="preset-btn" onclick="setNaca('6412')">6412</button>
+      <button class="preset-btn" onclick="setNaca('23012')">23012</button>
+      <button class="preset-btn" onclick="setNaca('63412')">63412</button>
+      <button class="preset-btn" onclick="setNaca('65415')">65415</button>
+      <button class="preset-btn" onclick="setNaca('66206')">66206</button>
+    </div>
+  </div>
+
+  <!-- AoA -->
+  <div>
+    <div class="row">
+      <div class="section-label">Angle of attack</div>
+      <span class="val" id="alphaVal">0.0°</span>
+    </div>
+    <input type="range" id="alphaSlider" min="-20" max="20" value="0" step="0.5">
+  </div>
+
+  <!-- Resolution -->
+  <div>
+    <div class="row">
+      <div class="section-label">Resolution</div>
+      <span class="val" id="nptsVal">150</span>
+    </div>
+    <input type="range" id="nptsSlider" min="40" max="400" value="150" step="10">
+  </div>
+
+  <!-- Toggles -->
+  <div>
+    <div class="section-label">Display</div>
+    <label class="toggle-row"><input type="checkbox" id="chkCamber" checked><span>Camber line</span></label>
+    <label class="toggle-row"><input type="checkbox" id="chkThickness"><span>Thickness bars</span></label>
+    <label class="toggle-row"><input type="checkbox" id="chkChord" checked><span>Chord &amp; axes</span></label>
+    <label class="toggle-row"><input type="checkbox" id="chkLabels" checked><span>Annotations</span></label>
+    <label class="toggle-row"><input type="checkbox" id="chkGrid"><span>Grid</span></label>
+    <label class="toggle-row"><input type="checkbox" id="chkFill" checked><span>Fill</span></label>
+  </div>
+
+  <!-- Geometry stats -->
+  <div>
+    <div class="section-label">Geometry</div>
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card"><div class="label">Max camber</div><div class="value accent" id="sMaxCamber">—</div></div>
+      <div class="stat-card"><div class="label">Camber pos</div><div class="value accent" id="sCamberPos">—</div></div>
+      <div class="stat-card"><div class="label">Max thickness</div><div class="value accent" id="sMaxThick">—</div></div>
+      <div class="stat-card"><div class="label">Thick. pos</div><div class="value accent" id="sThickPos">—</div></div>
+      <div class="stat-card"><div class="label">Area</div><div class="value" id="sArea">—</div></div>
+      <div class="stat-card"><div class="label">LE radius</div><div class="value" id="sLeRadius">—</div></div>
+    </div>
+  </div>
+
+  <!-- Compare -->
+  <div>
+    <div class="section-label">Compare overlays</div>
+    <div id="compareList"></div>
+    <button id="addCompareBtn" onclick="addCompare()">+ add airfoil</button>
+  </div>
+
+</aside>
+
+<main>
+  <canvas id="canvas"></canvas>
+  <div class="canvas-overlay">scroll: zoom · drag: pan · double-click: reset</div>
+</main>
+</div>
+
+<script>
+'use strict';
+
+// ── NACA geometry ─────────────────────────────────────────────────────────────
+
+function cosineSpace(n) {
+  const xs = [];
+  for (let i = 0; i <= n; i++) xs.push((1 - Math.cos(Math.PI * i / n)) / 2);
+  return xs;
+}
+
+function thicknessNACA(x, t) {
+  // NACA TR-460 polynomial (closed TE: last coeff -0.1015 → open TE: -0.1036)
+  const sq = Math.sqrt(Math.max(x, 1e-10));
+  return 5 * t * (0.2969*sq - 0.1260*x - 0.3516*x*x + 0.2843*x*x*x - 0.1015*x*x*x*x);
+}
+
+function camber4(x, m, p) {
+  if (m < 1e-6 || p < 1e-6) return {yc:0, dyc:0};
+  if (x < p) {
+    return {
+      yc:  m/(p*p) * (2*p*x - x*x),
+      dyc: 2*m/(p*p) * (p - x),
+    };
+  } else {
+    return {
+      yc:  m/((1-p)*(1-p)) * (1 - 2*p + 2*p*x - x*x),
+      dyc: 2*m/((1-p)*(1-p)) * (p - x),
+    };
+  }
+}
+
+// NACA 5-digit camber (for 210-250 series) — tabulated r, k1 values
+const NACA5_TABLE = {
+  2: {r:0.2025, k1:15.957},
+  3: {r:0.2700, k1: 6.643},  // approx; 230
+  4: {r:0.3500, k1: 3.230},
+  5: {r:0.4410, k1: 1.611},
+};
+function camber5(x, p_digit, cli_frac) {
+  const entry = NACA5_TABLE[p_digit] || NACA5_TABLE[2];
+  const {r, k1} = entry;
+  const scale = cli_frac / 0.3;  // normalise relative to 0.3 design Cl
+  if (x < r) {
+    return {yc: scale*k1/6*(x*x*x - 3*r*x*x + r*r*(3-r)*x), dyc: scale*k1/6*(3*x*x - 6*r*x + r*r*(3-r))};
+  } else {
+    return {yc: scale*k1*r*r*r/6*(1-x), dyc: -scale*k1*r*r*r/6};
+  }
+}
+
+// NACA 6-series mean line (a=1.0 loading): yc = cli/(4π) * [-(1-x)ln(1-x) - x·ln(x)]
+function camber6(x, cli) {
+  const eps = 1e-6;
+  const xc = Math.max(eps, Math.min(1-eps, x));
+  const yc  = cli/(4*Math.PI) * (-(1-xc)*Math.log(1-xc) - xc*Math.log(xc));
+  const dyc = cli/(4*Math.PI) * (Math.log(1-xc) - Math.log(xc));
+  return {yc, dyc};
+}
+
+// Parse designation string → {family, m, p, t, cli, series, valid, label}
+function parseNaca(s) {
+  s = s.trim().toUpperCase().replace(/^NACA\s*/,'');
+
+  // 6-series: e.g. 63412, 63-412, 64415, 65206
+  const m6 = s.match(/^(6[3-7])-?(\d)(\d{2})$/);
+  if (m6) {
+    const series = parseInt(m6[1]);
+    const cli    = parseInt(m6[2]) / 10;
+    const t      = parseInt(m6[3]) / 100;
+    return {family:'6', series, cli, t, valid:true,
+      label:`NACA ${series}${Math.round(cli*10)}${String(Math.round(t*100)).padStart(2,'0')} — 6-series`};
+  }
+
+  // 5-digit: e.g. 23012, 24015
+  const m5 = s.match(/^([1-9])([1-5])0(\d{2})$/);
+  if (m5) {
+    const Cl_design = parseInt(m5[1]) * 3/20;  // first digit * 0.15
+    const p_digit   = parseInt(m5[2]);
+    const t         = parseInt(m5[3]) / 100;
+    return {family:'5', Cl_design, p_digit, t, valid:true,
+      label:`NACA ${s} — 5-digit  t=${Math.round(t*100)}%`};
+  }
+
+  // 4-digit: e.g. 4412, 0012, 2412
+  const m4 = s.match(/^(\d)(\d)(\d{2})$/);
+  if (m4) {
+    const m = parseInt(m4[1]) / 100;
+    const p = parseInt(m4[2]) / 10;
+    const t = parseInt(m4[3]) / 100;
+    const symm = m < 0.001 ? 'symmetric' : '';
+    return {family:'4', m, p, t, valid:true,
+      label:`NACA ${s} — 4-digit  ${symm}`};
+  }
+
+  return {valid:false, label:'Unrecognised — try 4412, 23012, 63412'};
+}
+
+// Generate surface points for a parsed designation
+// Returns { upper: [{x,y}], lower: [{x,y}], camberLine: [{x,y}] }
+function generateAirfoil(desig, npts) {
+  const xs = cosineSpace(npts);
+  const upper = [], lower = [], camberLine = [];
+
+  for (let i = 0; i <= npts; i++) {
+    const x = xs[i];
+    const yt = thicknessNACA(x, desig.t);
+
+    let yc = 0, dyc = 0;
+    if (desig.family === '4') {
+      ({yc, dyc} = camber4(x, desig.m, desig.p));
+    } else if (desig.family === '5') {
+      ({yc, dyc} = camber5(x, desig.p_digit, desig.Cl_design));
+    } else if (desig.family === '6') {
+      ({yc, dyc} = camber6(x, desig.cli));
+    }
+
+    const theta = Math.atan(dyc);
+    upper.push({x: x - yt*Math.sin(theta), y: yc + yt*Math.cos(theta)});
+    lower.push({x: x + yt*Math.sin(theta), y: yc - yt*Math.cos(theta)});
+    camberLine.push({x, y: yc});
+  }
+
+  return {upper, lower, camberLine};
+}
+
+// Compute key geometric properties
+function geometryStats(desig, foil) {
+  const {upper, lower, camberLine} = foil;
+  const n = upper.length;
+
+  // Max thickness and position
+  let maxT = 0, xMaxT = 0;
+  for (let i = 0; i < n; i++) {
+    const t = upper[i].y - lower[i].y;
+    if (t > maxT) { maxT = t; xMaxT = (upper[i].x + lower[i].x) / 2; }
+  }
+
+  // Max camber and position
+  let maxC = 0, xMaxC = 0;
+  for (const pt of camberLine) {
+    if (Math.abs(pt.y) > Math.abs(maxC)) { maxC = pt.y; xMaxC = pt.x; }
+  }
+
+  // Area (shoelace over upper then lower reversed)
+  let area = 0;
+  const full = [...upper, ...[...lower].reverse()];
+  for (let i = 0; i < full.length; i++) {
+    const j = (i+1) % full.length;
+    area += full[i].x * full[j].y - full[j].x * full[i].y;
+  }
+  area = Math.abs(area) / 2;
+
+  // LE radius approximation (fit circle to first few upper+lower points)
+  // Use parabola fit near LE: r_le ≈ (a/2) where y=a*sqrt(x) near x=0
+  // For NACA: r_le = 1.1019 * (t/0.2)^2  (from NACA TR-460)
+  const rLE = 1.1019 * desig.t * desig.t / 0.04;
+
+  return {
+    maxThick: maxT, xMaxT,
+    maxCamber: maxC, xMaxC,
+    area, rLE
+  };
+}
+
+// ── Canvas state ──────────────────────────────────────────────────────────────
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let state = {
+  desig: parseNaca('4412'),
+  npts: 150,
+  alpha: 0,
+  showCamber: true,
+  showThickness: false,
+  showChord: true,
+  showLabels: true,
+  showGrid: false,
+  showFill: true,
+  // viewport
+  panX: 0, panY: 0, zoom: 1,
+  dragging: false, lastMX: 0, lastMY: 0,
+};
+
+const COMPARE_COLORS = ['#ffa657','#bc8cff','#39d353','#f78166'];
+let compareList = [];  // [{desig, naca_str}]
+
+// ── Rendering ─────────────────────────────────────────────────────────────────
+
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width  = rect.width  * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width  = rect.width  + 'px';
+  canvas.style.height = rect.height + 'px';
+  ctx.scale(dpr, dpr);
+  draw();
+}
+
+function canvasSize() {
+  const dpr = window.devicePixelRatio || 1;
+  return {w: canvas.width/dpr, h: canvas.height/dpr};
+}
+
+// Map airfoil coords [0..1, -0.2..0.2] → canvas pixels
+function makeTransform() {
+  const {w, h} = canvasSize();
+  // Fit x∈[0,1] into canvas with padding, then apply pan/zoom
+  const pad = 80;
+  const baseScale = (w - 2*pad) / 1.0;  // 1 chord = canvas width minus padding
+  const scale = baseScale * state.zoom;
+  const cx = pad + state.panX + w/2 - baseScale/2;   // center chord in canvas
+  const cy = h/2 + state.panY;
+  return {
+    x: (ax) => cx + ax * scale,
+    y: (ay) => cy - ay * scale,  // flip y
+    s: scale,
+  };
+}
+
+function rotatePt(pt, alpha_rad) {
+  const c = Math.cos(-alpha_rad), s = Math.sin(-alpha_rad);
+  return {x: pt.x*c - pt.y*s, y: pt.x*s + pt.y*c};
+}
+
+function rotateContour(pts, alpha_rad) {
+  return pts.map(p => rotatePt(p, alpha_rad));
+}
+
+function pathFromPts(pts, T) {
+  if (!pts.length) return;
+  ctx.moveTo(T.x(pts[0].x), T.y(pts[0].y));
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(T.x(pts[i].x), T.y(pts[i].y));
+}
+
+function draw() {
+  const {w, h} = canvasSize();
+  const T = makeTransform();
+  const alpha_rad = state.alpha * Math.PI / 180;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, w, h);
+
+  // ── Grid ──
+  if (state.showGrid) {
+    ctx.strokeStyle = '#1c2128';
+    ctx.lineWidth = 1;
+    const step = 0.1;
+    for (let xg = 0; xg <= 1; xg += step) {
+      ctx.beginPath();
+      ctx.moveTo(T.x(xg), 0);
+      ctx.lineTo(T.x(xg), h);
+      ctx.stroke();
+    }
+    for (let yg = -0.3; yg <= 0.3; yg += step) {
+      ctx.beginPath();
+      ctx.moveTo(0,   T.y(yg));
+      ctx.lineTo(w, T.y(yg));
+      ctx.stroke();
+    }
+  }
+
+  // ── Compare overlays (behind main) ──
+  compareList.forEach(({desig: d, color}) => {
+    const foil = generateAirfoil(d, state.npts);
+    const upper = rotateContour(foil.upper, alpha_rad);
+    const lower = rotateContour(foil.lower, alpha_rad);
+    ctx.beginPath();
+    pathFromPts(upper, T);
+    pathFromPts([...lower].reverse(), T);
+    ctx.closePath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5,4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  // ── Main airfoil ──
+  const foil = generateAirfoil(state.desig, state.npts);
+  const upper   = rotateContour(foil.upper,     alpha_rad);
+  const lower   = rotateContour(foil.lower,     alpha_rad);
+  const camber  = rotateContour(foil.camberLine, alpha_rad);
+
+  // Chord line
+  if (state.showChord) {
+    const leRot = rotatePt({x:0,y:0}, alpha_rad);
+    const teRot = rotatePt({x:1,y:0}, alpha_rad);
+    ctx.strokeStyle = '#21262d';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6,4]);
+    ctx.beginPath();
+    ctx.moveTo(T.x(leRot.x), T.y(leRot.y));
+    ctx.lineTo(T.x(teRot.x), T.y(teRot.y));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Freestream arrow to the left
+    const arrowLen = 50;
+    const ax1 = T.x(leRot.x), ay1 = T.y(leRot.y);
+    const ax0 = ax1 - arrowLen;
+    ctx.strokeStyle = '#3d4450'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(ax0, ay1); ctx.lineTo(ax1, ay1); ctx.stroke();
+    const hw = 7, hh = 3;
+    ctx.fillStyle = '#3d4450';
+    ctx.beginPath();
+    ctx.moveTo(ax1, ay1);
+    ctx.lineTo(ax1-hw, ay1-hh); ctx.lineTo(ax1-hw, ay1+hh);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#6e7681'; ctx.font = '11px monospace';
+    ctx.fillText('V∞', ax0-24, ay1+4);
+  }
+
+  // Fill
+  if (state.showFill) {
+    ctx.beginPath();
+    pathFromPts(upper, T);
+    pathFromPts([...lower].reverse(), T);
+    ctx.closePath();
+    const gy = ctx.createLinearGradient(0, T.y(0.08), 0, T.y(-0.08));
+    gy.addColorStop(0,   '#1c2128');
+    gy.addColorStop(0.5, '#161b22');
+    gy.addColorStop(1,   '#1c2128');
+    ctx.fillStyle = gy;
+    ctx.fill();
+  }
+
+  // Thickness bars
+  if (state.showThickness) {
+    const step = Math.max(1, Math.floor(state.npts / 20));
+    for (let i = 0; i <= state.npts; i += step) {
+      const u = upper[i], l = lower[i];
+      if (!u || !l) continue;
+      ctx.beginPath();
+      ctx.moveTo(T.x(u.x), T.y(u.y));
+      ctx.lineTo(T.x(l.x), T.y(l.y));
+      ctx.strokeStyle = 'rgba(57,211,83,0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  // Camber line
+  if (state.showCamber) {
+    ctx.beginPath();
+    pathFromPts(camber, T);
+    ctx.strokeStyle = '#ffa657';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([4,3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Outline
+  ctx.beginPath();
+  pathFromPts(upper, T);
+  pathFromPts([...lower].reverse(), T);
+  ctx.closePath();
+  ctx.strokeStyle = '#c9d1d9';
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+
+  // LE/TE dots
+  const le = upper[0];  // upper[0] ≈ TE, upper[npts] ≈ also TE after wrap
+  // LE is at minimum x in camber line
+  let leIdx = 0;
+  for (let i = 1; i < camber.length; i++) if (camber[i].x < camber[leIdx].x) leIdx = i;
+  const leU = upper[leIdx], leL = lower[leIdx];
+  const leXc = (leU.x + leL.x)/2, leYc = (leU.y + leL.y)/2;
+
+  ctx.beginPath(); ctx.arc(T.x(leXc), T.y(leYc), 3.5, 0, 2*Math.PI);
+  ctx.fillStyle = '#79c0ff'; ctx.fill();
+
+  const teU = upper[0], teL = lower[0];
+  const teXc = (teU.x+teL.x)/2, teYc = (teU.y+teL.y)/2;
+  ctx.beginPath(); ctx.arc(T.x(teXc), T.y(teYc), 3, 0, 2*Math.PI);
+  ctx.fillStyle = '#6e7681'; ctx.fill();
+
+  // ── Annotations ──
+  if (state.showLabels) {
+    const stats = geometryStats(state.desig, foil); // use un-rotated foil for stats
+
+    // Max-thickness marker (on rotated)
+    let iT = 0;
+    for (let i = 1; i <= state.npts; i++) {
+      const t = foil.upper[i].y - foil.lower[i].y;
+      const tb = foil.upper[iT].y - foil.lower[iT].y;
+      if (t > tb) iT = i;
+    }
+    const uT = upper[iT], lT = lower[iT];
+    ctx.strokeStyle = 'rgba(86,211,100,0.6)'; ctx.lineWidth = 1;
+    ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(T.x(uT.x),T.y(uT.y)); ctx.lineTo(T.x(lT.x),T.y(lT.y)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#56d364'; ctx.font = '10px monospace';
+    ctx.fillText(`t/c=${(stats.maxThick*100).toFixed(1)}%`, T.x(uT.x)+5, T.y(uT.y)-6);
+
+    // Max-camber marker
+    if (stats.maxCamber > 0.002) {
+      let iC = 0;
+      for (let i = 1; i < camber.length; i++)
+        if (Math.abs(camber[i].y) > Math.abs(camber[iC].y)) iC = i;
+      const cp = camber[iC];
+      ctx.beginPath(); ctx.arc(T.x(cp.x), T.y(cp.y), 3, 0, 2*Math.PI);
+      ctx.fillStyle = '#ffa657'; ctx.fill();
+      ctx.fillStyle = '#ffa657'; ctx.font = '10px monospace';
+      ctx.fillText(`yc=${(stats.maxCamber*100).toFixed(1)}%`, T.x(cp.x)+6, T.y(cp.y)-5);
+    }
+
+    // Designation label top-left of canvas
+    ctx.fillStyle = '#e6edf3'; ctx.font = 'bold 14px monospace';
+    ctx.fillText('NACA ' + nacaInput.value.trim().toUpperCase(), 16, 28);
+    ctx.fillStyle = '#8b949e'; ctx.font = '11px monospace';
+    ctx.fillText(state.desig.label.replace(/^NACA \S+\s*—\s*/,''), 16, 44);
+    if (state.alpha !== 0) {
+      ctx.fillStyle = '#79c0ff';
+      ctx.fillText(`α = ${state.alpha.toFixed(1)}°`, 16, 60);
+    }
+  }
+
+  // Update stats panel
+  updateStats();
+}
+
+function updateStats() {
+  const foil = generateAirfoil(state.desig, state.npts);
+  const s = geometryStats(state.desig, foil);
+  document.getElementById('sMaxCamber').textContent = (s.maxCamber*100).toFixed(2)+'%';
+  document.getElementById('sCamberPos').textContent  = (s.xMaxC*100).toFixed(1)+'%c';
+  document.getElementById('sMaxThick').textContent   = (s.maxThick*100).toFixed(2)+'%';
+  document.getElementById('sThickPos').textContent   = (s.xMaxT*100).toFixed(1)+'%c';
+  document.getElementById('sArea').textContent       = s.area.toFixed(4);
+  document.getElementById('sLeRadius').textContent   = s.rLE.toFixed(4);
+}
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+
+const nacaInput = document.getElementById('nacaInput');
+const parseHint = document.getElementById('parseHint');
+
+function setNaca(s) {
+  nacaInput.value = s;
+  applyNaca(s);
+}
+
+function applyNaca(s) {
+  const d = parseNaca(s);
+  nacaInput.classList.toggle('error', !d.valid);
+  parseHint.textContent = d.label || 'Invalid designation';
+  parseHint.style.color = d.valid ? 'var(--muted)' : 'var(--red)';
+  if (d.valid) { state.desig = d; draw(); }
+}
+
+let debounceTimer;
+nacaInput.addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => applyNaca(nacaInput.value), 300);
+});
+
+document.getElementById('alphaSlider').addEventListener('input', e => {
+  state.alpha = parseFloat(e.target.value);
+  document.getElementById('alphaVal').textContent = state.alpha.toFixed(1) + '°';
+  draw();
+});
+
+document.getElementById('nptsSlider').addEventListener('input', e => {
+  state.npts = parseInt(e.target.value);
+  document.getElementById('nptsVal').textContent = state.npts;
+  draw();
+});
+
+['chkCamber','chkThickness','chkChord','chkLabels','chkGrid','chkFill'].forEach(id => {
+  const key = id.replace('chk','show');
+  const prop = key.charAt(0).toLowerCase() + key.slice(1);
+  document.getElementById(id).addEventListener('change', e => {
+    state[prop] = e.target.checked;
+    draw();
+  });
+});
+
+// ── Compare ───────────────────────────────────────────────────────────────────
+
+function renderCompareList() {
+  const el = document.getElementById('compareList');
+  el.innerHTML = '';
+  compareList.forEach(({naca_str, color}, i) => {
+    const div = document.createElement('div');
+    div.className = 'compare-item';
+    div.innerHTML = `
+      <div class="compare-swatch" style="background:${color}"></div>
+      <span class="compare-name">${naca_str.toUpperCase()}</span>
+      <button class="compare-del" onclick="removeCompare(${i})">✕</button>
+    `;
+    el.appendChild(div);
+  });
+}
+
+function addCompare() {
+  const s = prompt('NACA designation to overlay:', '2412');
+  if (!s) return;
+  const d = parseNaca(s);
+  if (!d.valid) { alert('Unrecognised: ' + s); return; }
+  compareList.push({desig:d, naca_str:s, color: COMPARE_COLORS[compareList.length % COMPARE_COLORS.length]});
+  renderCompareList();
+  draw();
+}
+
+function removeCompare(i) {
+  compareList.splice(i, 1);
+  renderCompareList();
+  draw();
+}
+
+// ── Pan + zoom ────────────────────────────────────────────────────────────────
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY > 0 ? 0.9 : 1/0.9;
+  state.zoom = Math.max(0.3, Math.min(8, state.zoom * factor));
+  draw();
+}, {passive: false});
+
+canvas.addEventListener('mousedown', e => {
+  state.dragging = true;
+  state.lastMX = e.clientX;
+  state.lastMY = e.clientY;
+});
+window.addEventListener('mousemove', e => {
+  if (!state.dragging) return;
+  state.panX += e.clientX - state.lastMX;
+  state.panY += e.clientY - state.lastMY;
+  state.lastMX = e.clientX;
+  state.lastMY = e.clientY;
+  draw();
+});
+window.addEventListener('mouseup', () => { state.dragging = false; });
+canvas.addEventListener('dblclick', () => {
+  state.panX = 0; state.panY = 0; state.zoom = 1; draw();
+});
+
+// Touch support
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    state.dragging = true;
+    state.lastMX = e.touches[0].clientX;
+    state.lastMY = e.touches[0].clientY;
+  }
+}, {passive:true});
+canvas.addEventListener('touchmove', e => {
+  if (!state.dragging || e.touches.length !== 1) return;
+  e.preventDefault();
+  state.panX += e.touches[0].clientX - state.lastMX;
+  state.panY += e.touches[0].clientY - state.lastMY;
+  state.lastMX = e.touches[0].clientX;
+  state.lastMY = e.touches[0].clientY;
+  draw();
+}, {passive:false});
+canvas.addEventListener('touchend', () => { state.dragging = false; });
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+const ro = new ResizeObserver(resizeCanvas);
+ro.observe(canvas.parentElement);
+resizeCanvas();
+</script>
+</body>
+</html>

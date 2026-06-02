@@ -11,6 +11,10 @@ path = "src/main.rs"
 name = "titaniumfoil-bench"
 path = "src/bench.rs"
 
+[[bin]]
+name = "titaniumfoil-viz"
+path = "src/viz.rs"
+
 [dependencies]
 titaniumfoil-core  = { workspace = true }
 titaniumfoil-metal = { workspace = true }
